@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Event Matcher Organiser</title>
+<style>
+  :root{--bg:#F2F5F8;--card:#fff;--ink:#13212C;--muted:#566574;--line:#D5DDE5;--accent:#2447D6;--accent-soft:#E6ECFB;--ok:#1B7A4B;--warn:#B76E00;--bad:#B3261E}
+  *{box-sizing:border-box}
+  [hidden]{display:none !important}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:960px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
+  h1{font-size:26px;margin:0;line-height:1.2} h2{font-size:18px;margin:0} h3{font-size:15px;margin:0} p{margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+  label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+  input{font:inherit;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:8px;width:100%}
+  button,.btn{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 16px;cursor:pointer;text-decoration:none;display:inline-block}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{color:var(--bad);border-color:var(--bad)}
+  button:disabled{opacity:.6;cursor:default}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .between{justify-content:space-between}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .form2{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+  .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .kpi b{display:block;font-size:30px;line-height:1.1;font-variant-numeric:tabular-nums}
+  .kpi span{color:var(--muted);font-size:13px}
+  .muted{color:var(--muted);font-size:14px}
+  .small{font-size:13px}
+  .err{color:var(--bad);font-weight:600;font-size:14px}
+  .ok{color:var(--ok);font-weight:600;font-size:14px}
+  .bars{display:flex;flex-direction:column;gap:8px}
+  .bar-row{display:grid;grid-template-columns:minmax(90px,38%) 1fr auto;gap:8px;align-items:center;font-size:14px}
+  .bar-track{background:#EEF2F6;border-radius:6px;height:12px;overflow:hidden}
+  .bar{height:100%;background:var(--accent);border-radius:6px}
+  .bar.alt{background:#8EA4EC}
+  .pair{display:flex;flex-direction:column;gap:3px}
+  .legend{display:flex;gap:16px;font-size:13px;color:var(--muted)}
+  .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .cols{display:flex;align-items:flex-end;gap:4px;height:140px;border-bottom:1px solid var(--line);padding-top:8px}
+  .col{flex:1;max-width:48px;background:var(--accent);border-radius:4px 4px 0 0;min-height:2px}
+  .insight{background:#FFF3D6;border:1px solid #F0D58C;border-radius:10px;padding:10px 12px;font-size:14px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  td,th{text-align:left;padding:6px 8px;border-top:1px solid var(--line)}
+  .scroll{overflow-x:auto}
+  details summary{cursor:pointer;font-weight:600}
+  code{background:#EEF2F6;padding:2px 6px;border-radius:6px;font-size:13px;word-break:break-all}
+  @media print{
+    body{background:#fff} .noprint{display:none !important} main{max-width:none;padding:0}
+    .card,.kpi{break-inside:avoid;border-color:#ccc}
+  }
+</style>
+</head>
+<body>
+<main>
+  <div><h1>Organiser dashboard</h1><p class="muted noprint">Live numbers for your event. Keep your password private.</p></div>
+
+  <div class="card noprint" id="login">
+    <div class="form2">
+      <label for="code">Event code<input id="code" type="text" placeholder="NITT1" autocapitalize="characters" autocomplete="off"></label>
+      <label for="key">Organiser password<input id="key" type="password" autocomplete="current-password"></label>
+    </div>
+    <div class="row"><button class="primary" id="open" type="button">Open dashboard</button></div>
+    <p id="msg" role="status"></p>
+  </div>
+
+  <section id="dash" class="stack" hidden></section>
+
+  <details class="card noprint" id="master">
+    <summary>Master admin (only for you, the app owner)</summary>
+    <p class="muted">Create events and give each organiser their own password. Organisers can only see their own event.</p>
+    <label for="mkey">Master admin key<input id="mkey" type="password" autocomplete="off"></label>
+    <div class="form2">
+      <label for="ncode">Event code<input id="ncode" type="text" placeholder="NITT1" autocapitalize="characters"></label>
+      <label for="nname">Event name<input id="nname" type="text" placeholder="NIT Trichy Startup Meetup"></label>
+      <label for="ntag">Tagline (optional)<input id="ntag" type="text" placeholder="Find your co-founder tonight"></label>
+      <label for="norg">Organiser password (8+ characters)<input id="norg" type="text" autocomplete="off" placeholder="Leave empty to keep the current one"></label>
+    </div>
+    <div class="row">
+      <button class="primary" id="create" type="button">Create or update event</button>
+      <button id="list" type="button">Show all events</button>
+    </div>
+    <p id="mmsg" role="status"></p>
+    <div class="scroll" id="events"></div>
+  </details>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var cfg = window.EMS_CONFIG || {};
+  var sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  var $ = function (id) { return document.getElementById(id); };
+  var SKILLS = ['Coding', 'AI / ML', 'Design', 'Marketing / sales', 'Business / strategy', 'Finance', 'Hardware / electronics', 'Content / video'];
+  var cur = { code: '', key: '', data: null, timer: null, armed: false };
+
+  function h(tag, attrs) {
+    var el = document.createElement(tag); attrs = attrs || {};
+    Object.keys(attrs).forEach(function (k) {
+      var v = attrs[k];
+      if (k === 'class') el.className = v; else if (k === 'text') el.textContent = v;
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else if (v !== false && v !== null && v !== undefined) el.setAttribute(k, v === true ? '' : v);
+    });
+    for (var i = 2; i < arguments.length; i++) { var c = arguments[i]; if (c == null || c === false) continue; el.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); }
+    return el;
+  }
+  function call(name, args) { return sb.rpc(name, args).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; }); }
+  function say(id, text, cls) { var m = $(id); if (!m) return; m.textContent = text; m.className = cls || ''; }
+  function siteBase() { return location.origin + location.pathname.replace(/admin\.html$/, ''); }
+  function pct(a, b) { return b ? Math.round(100 * a / b) : 0; }
+  function time(ts) { try { return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } }
+
+  try { $('code').value = localStorage.getItem('ems_org_code') || ''; } catch (e) {}
+  try { var k0 = sessionStorage.getItem('ems_org_key'); if (k0) $('key').value = k0; } catch (e) {}
+
+  // ---------- dashboard ----------
+  function open() {
+    var code = $('code').value.trim(), key = $('key').value;
+    if (!code || !key) return say('msg', 'Enter the event code and your password.', 'err');
+    $('open').disabled = true;
+    call('admin_overview', { p_key: key, p_event: code }).then(function (d) {
+      cur.code = d.event.code; cur.key = key; cur.data = d; cur.armed = false;
+      try { localStorage.setItem('ems_org_code', cur.code); sessionStorage.setItem('ems_org_key', key); } catch (e) {}
+      say('msg', '');
+      $('login').hidden = true;
+      draw();
+      if (cur.timer) clearInterval(cur.timer);
+      cur.timer = setInterval(refresh, 20000);
+    }).catch(function (e) { say('msg', e.message, 'err'); }).then(function () { $('open').disabled = false; });
+  }
+  function refresh() {
+    if (!cur.code || document.hidden) return;
+    call('admin_overview', { p_key: cur.key, p_event: cur.code }).then(function (d) { cur.data = d; draw(); }).catch(function () {});
+  }
+
+  function barList(items, max) {
+    var wrap = h('div', { class: 'bars' });
+    if (!items.length) wrap.appendChild(h('p', { class: 'muted', text: 'No data yet.' }));
+    items.forEach(function (it) {
+      wrap.appendChild(h('div', { class: 'bar-row' }, h('span', { text: it.label }),
+        h('div', { class: 'bar-track' }, h('div', { class: 'bar', style: 'width:' + pct(it.n, max) + '%' })),
+        h('strong', { text: String(it.n) })));
+    });
+    return wrap;
+  }
+
+  function supplyDemand(d) {
+    var need = {}, offer = {};
+    (d.needs || []).forEach(function (x) { need[x.label] = x.n; });
+    (d.offers || []).forEach(function (x) { offer[x.label] = x.n; });
+    var labels = SKILLS.filter(function (s) { return need[s] || offer[s]; });
+    Object.keys(need).concat(Object.keys(offer)).forEach(function (s) { if (labels.indexOf(s) === -1) labels.push(s); });
+    var max = 1; labels.forEach(function (s) { max = Math.max(max, need[s] || 0, offer[s] || 0); });
+    labels.sort(function (a, b) { return ((need[b] || 0) - (offer[b] || 0)) - ((need[a] || 0) - (offer[a] || 0)); });
+    var wrap = h('div', { class: 'bars' });
+    labels.forEach(function (s) {
+      var n = need[s] || 0, o = offer[s] || 0;
+      wrap.appendChild(h('div', { class: 'bar-row' }, h('span', { text: s }),
+        h('div', { class: 'pair' },
+          h('div', { class: 'bar-track', title: 'Looking for: ' + n }, h('div', { class: 'bar', style: 'width:' + pct(n, max) + '%' })),
+          h('div', { class: 'bar-track', title: 'Offering: ' + o }, h('div', { class: 'bar alt', style: 'width:' + pct(o, max) + '%' }))),
+        h('span', { class: 'small', text: n + ' want / ' + o + ' offer' })));
+    });
+    var gap = labels[0], insight = null;
+    if (gap && (need[gap] || 0) > (offer[gap] || 0)) {
+      insight = h('p', { class: 'insight' }, h('strong', { text: gap + ' is in short supply. ' }),
+        (need[gap] || 0) + ' people are looking for it and only ' + (offer[gap] || 0) + ' offer it. Invite more people with this skill, or announce it from the stage.');
+    }
+    return h('div', { class: 'card' }, h('h2', { text: 'Skills: wanted vs offered' }),
+      h('p', { class: 'legend' }, h('span', null, h('span', { class: 'sw', style: 'background:#2447D6' }), 'Looking for'), h('span', null, h('span', { class: 'sw', style: 'background:#8EA4EC' }), 'Offering')),
+      insight, labels.length ? wrap : h('p', { class: 'muted', text: 'No data yet.' }));
+  }
+
+  function timeline(d) {
+    var t = d.timeline || [];
+    var max = 1; t.forEach(function (x) { max = Math.max(max, x.n); });
+    var cols = h('div', { class: 'cols', role: 'img', 'aria-label': 'People joining every 15 minutes' });
+    t.forEach(function (x) { cols.appendChild(h('div', { class: 'col', style: 'height:' + Math.max(2, pct(x.n, max)) + '%', title: time(x.bucket) + ': ' + x.n + ' joined' })); });
+    return h('div', { class: 'card' }, h('h2', { text: 'People joining (every 15 minutes)' }),
+      t.length ? cols : h('p', { class: 'muted', text: 'Nobody has joined yet.' }),
+      t.length ? h('div', { class: 'row between muted small' }, h('span', { text: time(t[0].bucket) }), h('span', { text: time(t[t.length - 1].bucket) })) : null);
+  }
+
+  function draw() {
+    var d = cur.data, dash = $('dash');
+    dash.hidden = false; dash.textContent = '';
+    var link = siteBase() + '?event=' + encodeURIComponent(cur.code);
+    var wall = siteBase() + 'wall.html?event=' + encodeURIComponent(cur.code);
+
+    dash.appendChild(h('div', { class: 'card' },
+      h('div', { class: 'row between' },
+        h('div', null, h('h2', { text: d.event.name }), d.event.tagline ? h('p', { class: 'muted', text: d.event.tagline }) : null,
+          h('p', { class: 'muted small', text: 'Updated ' + new Date().toLocaleTimeString() + ' (refreshes every 20 seconds)' })),
+        h('div', { class: 'row noprint' },
+          h('a', { class: 'btn', href: wall, target: '_blank', rel: 'noopener', text: 'Open live wall' }),
+          h('button', { type: 'button', text: 'Sign out', onclick: function () {
+            clearInterval(cur.timer); cur = { code: '', key: '', data: null, timer: null, armed: false };
+            try { sessionStorage.removeItem('ems_org_key'); } catch (e) {}
+            $('key').value = ''; $('login').hidden = false; $('dash').hidden = true;
+          } }))),
+      h('p', { class: 'small' }, 'Participant link: ', h('code', { text: link }), ' ',
+        h('button', { type: 'button', class: 'noprint', text: 'Copy', style: 'padding:4px 10px;font-size:13px', onclick: function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(function () { say('msg2', 'Link copied.', 'ok'); }).catch(function () { say('msg2', link, ''); });
+        } })),
+      h('p', { id: 'msg2', role: 'status' })));
+
+    var kpis = h('div', { class: 'kpis' });
+    [[d.profiles, 'people joined'], [d.active_now, 'active in last 5 min'], [d.interests, 'interests sent'],
+     [d.mutual, 'connections made'], [pct(d.connected_people, d.profiles) + '%', 'of people got a connection'],
+     [d.waves, 'waves in the room'], [d.ai_served, 'got AI picks']].forEach(function (k) {
+      kpis.appendChild(h('div', { class: 'kpi' }, h('b', { text: String(k[0]) }), h('span', { text: k[1] })));
+    });
+    dash.appendChild(kpis);
+
+    dash.appendChild(timeline(d));
+    dash.appendChild(supplyDemand(d));
+
+    var roles = d.roles || [], intents = d.intents || [];
+    var rmax = 1; roles.forEach(function (x) { rmax = Math.max(rmax, x.n); });
+    var imax = 1; intents.forEach(function (x) { imax = Math.max(imax, x.n); });
+    dash.appendChild(h('div', { class: 'grid2' },
+      h('div', { class: 'card' }, h('h2', { text: 'Who came' }), barList(roles, rmax)),
+      h('div', { class: 'card' }, h('h2', { text: 'What they want' }), barList(intents, imax))));
+
+    var tb = h('tbody');
+    (d.recent || []).forEach(function (r) { tb.appendChild(h('tr', null, h('td', { text: r.name }), h('td', { text: r.college || '' }), h('td', { text: r.role }), h('td', { text: time(r.created_at) }))); });
+    dash.appendChild(h('div', { class: 'card' }, h('h2', { text: 'Latest people' }),
+      h('div', { class: 'scroll' }, h('table', null, h('thead', null, h('tr', null, h('th', { text: 'Name' }), h('th', { text: 'College / company' }), h('th', { text: 'Role' }), h('th', { text: 'Joined' }))), tb))));
+
+    var del = h('button', { type: 'button', class: 'danger', id: 'del', text: cur.armed ? 'Click again to delete everyone' : "Delete this event's people" });
+    del.addEventListener('click', function () {
+      if (!cur.armed) { cur.armed = true; draw(); return; }
+      cur.armed = false;
+      call('admin_delete_event_data', { p_key: cur.key, p_event: cur.code }).then(function () {
+        return call('admin_overview', { p_key: cur.key, p_event: cur.code });
+      }).then(function (d2) { cur.data = d2; draw(); say('msg2', 'All people for this event were deleted.', 'ok'); })
+        .catch(function (e) { draw(); say('msg2', e.message, 'err'); });
+    });
+    dash.appendChild(h('div', { class: 'card noprint' }, h('h2', { text: 'Reports and data' }),
+      h('div', { class: 'row' },
+        h('button', { type: 'button', class: 'primary', text: 'Download attendee list (CSV)', onclick: exportCsv }),
+        h('button', { type: 'button', text: 'Print or save report as PDF', onclick: function () { window.print(); } }),
+        del),
+      h('p', { class: 'muted small', text: 'The attendee list has names, colleges, roles, answers and connection counts. It never includes phone numbers. Delete the data after the event, as promised to participants.' })));
+  }
+
+  function csvCell(v) {
+    var s = String(v == null ? '' : v);
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  function exportCsv() {
+    call('admin_export', { p_key: cur.key, p_event: cur.code }).then(function (rows) {
+      var cols = ['name', 'college', 'role', 'wants', 'needs', 'offers', 'link', 'joined_at', 'connections'];
+      var lines = [cols.join(',')].concat((rows || []).map(function (r) { return cols.map(function (c) { return csvCell(r[c]); }).join(','); }));
+      var blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+      var a = h('a', { href: URL.createObjectURL(blob), download: cur.code + '-attendees.csv' });
+      document.body.appendChild(a); a.click(); a.remove();
+    }).catch(function (e) { say('msg2', e.message, 'err'); });
+  }
+
+  $('open').addEventListener('click', open);
+  $('key').addEventListener('keydown', function (e) { if (e.key === 'Enter') open(); });
+
+  // ---------- master admin ----------
+  $('create').addEventListener('click', function () {
+    var c = $('ncode').value.trim(), org = $('norg').value.trim();
+    call('admin_create_event', { p_key: $('mkey').value, p_code: c, p_name: $('nname').value.trim(),
+      p_tagline: $('ntag').value.trim(), p_org_key: org })
+      .then(function () {
+        say('mmsg', 'Saved. Participants join at ' + siteBase() + '?event=' + encodeURIComponent(c) +
+          (org ? '. Give the organiser the event code and the organiser password.' : ''), 'ok');
+        listEvents();
+      }).catch(function (e) { say('mmsg', e.message, 'err'); });
+  });
+  function listEvents() {
+    call('admin_list_events', { p_key: $('mkey').value }).then(function (rows) {
+      var tb = h('tbody');
+      (rows || []).forEach(function (r) {
+        tb.appendChild(h('tr', null, h('td', null, h('code', { text: r.code })), h('td', { text: r.name }), h('td', { text: String(r.people) }),
+          h('td', { text: r.has_org_key ? 'Yes' : 'No' }),
+          h('td', null, h('button', { type: 'button', text: 'Open', style: 'padding:4px 10px;font-size:13px', onclick: function () {
+            $('code').value = r.code; $('key').value = $('mkey').value; open(); window.scrollTo(0, 0);
+          } }))));
+      });
+      var box = $('events'); box.textContent = '';
+      box.appendChild(h('table', null, h('thead', null, h('tr', null, h('th', { text: 'Code' }), h('th', { text: 'Name' }), h('th', { text: 'People' }), h('th', { text: 'Organiser password set' }), h('th', { text: '' }))), tb));
+    }).catch(function (e) { say('mmsg', e.message, 'err'); });
+  }
+  $('list').addEventListener('click', listEvents);
+})();
+</script>
+</body>
+</html>

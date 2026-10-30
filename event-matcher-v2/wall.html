@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Event Matcher Live Wall</title>
+<style>
+  :root{--bg:#0E1726;--panel:#16223A;--ink:#F3F6FB;--muted:#9FB0C8;--accent:#7C9BFF;--ok:#46C98A}
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--ink);font:18px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .wrap{min-height:100%;padding:3vw;display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:3vw}
+  h1{font-size:clamp(28px,4.2vw,64px);line-height:1.05;margin:0}
+  .tag{color:var(--muted);font-size:clamp(16px,1.8vw,28px);margin:.6vw 0 0}
+  .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5vw;margin-top:2.5vw}
+  .num{background:var(--panel);border-radius:18px;padding:1.6vw}
+  .num b{display:block;font-size:clamp(40px,6vw,110px);line-height:1;font-variant-numeric:tabular-nums}
+  .num span{color:var(--muted);font-size:clamp(14px,1.4vw,22px)}
+  .num.hl b{color:var(--ok)}
+  .panel{background:var(--panel);border-radius:18px;padding:1.8vw;display:flex;flex-direction:column;gap:1vw}
+  h2{font-size:clamp(16px,1.6vw,26px);margin:0;color:var(--muted);font-weight:600}
+  .list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.7vw;font-size:clamp(16px,1.7vw,28px)}
+  .list li{display:flex;justify-content:space-between;gap:1vw}
+  .side{display:flex;flex-direction:column;gap:2vw}
+  .qr{background:#fff;border-radius:18px;padding:1.5vw;display:flex;flex-direction:column;align-items:center;gap:1vw;color:#13212C}
+  .qr #q img,.qr #q canvas{width:min(26vw,360px) !important;height:auto !important}
+  .qr p{margin:0;font-weight:700;font-size:clamp(16px,1.8vw,30px);text-align:center}
+  .qr small{font-size:clamp(12px,1.1vw,18px);color:#566574;word-break:break-all;text-align:center}
+  .err{color:#FF8A80}
+  .muted{color:var(--muted)}
+  @media (max-width:800px){.wrap{grid-template-columns:1fr}.nums{grid-template-columns:1fr 1fr 1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div>
+    <h1 id="name">Loading...</h1>
+    <p class="tag" id="tagline"></p>
+    <div class="nums">
+      <div class="num"><b id="people">0</b><span>people here</span></div>
+      <div class="num hl"><b id="conns">0</b><span>connections made</span></div>
+      <div class="num"><b id="waves">0</b><span>waves in the room</span></div>
+    </div>
+    <div class="panel" style="margin-top:2vw">
+      <h2>Just joined</h2>
+      <ul class="list" id="recent"></ul>
+    </div>
+  </div>
+  <div class="side">
+    <div class="qr">
+      <p>Scan to find the people worth meeting</p>
+      <div id="q" role="img" aria-label="QR code to join this event"></div>
+      <small id="link"></small>
+    </div>
+    <div class="panel">
+      <h2>Most wanted skills right now</h2>
+      <ul class="list" id="wanted"></ul>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var cfg = window.EMS_CONFIG || {};
+  var sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  var code = new URLSearchParams(location.search).get('event') || '';
+  var $ = function (id) { return document.getElementById(id); };
+  var link = location.origin + location.pathname.replace(/wall\.html$/, '') + '?event=' + encodeURIComponent(code);
+  var qrDone = false;
+
+  function li(a, b) {
+    var el = document.createElement('li');
+    var x = document.createElement('span'); x.textContent = a; el.appendChild(x);
+    var y = document.createElement('span'); y.className = 'muted'; y.textContent = b; el.appendChild(y);
+    return el;
+  }
+  function ago(ts) {
+    var s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
+    return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + ' min ago' : Math.floor(s / 3600) + ' h ago';
+  }
+  function makeQr() {
+    if (qrDone) return;
+    $('link').textContent = link;
+    try { new window.QRCode($('q'), { text: link, width: 360, height: 360, correctLevel: window.QRCode.CorrectLevel.M }); qrDone = true; }
+    catch (e) { $('q').textContent = 'Open the link below on your phone.'; qrDone = true; }
+  }
+  function load() {
+    if (!code) { $('name').textContent = 'Add ?event=YOURCODE to this page link'; return; }
+    sb.rpc('event_wall', { p_code: code }).then(function (r) {
+      if (r.error) throw new Error(r.error.message);
+      var d = r.data;
+      $('name').textContent = d.name; $('tagline').textContent = d.tagline || 'Tell us who you want to meet. AI finds them.';
+      document.title = d.name + ' | Live';
+      $('people').textContent = d.people; $('conns').textContent = d.connections; $('waves').textContent = d.waves;
+      var rec = $('recent'); rec.textContent = '';
+      (d.recent || []).forEach(function (p) { rec.appendChild(li('A ' + String(p.role || 'guest').toLowerCase() + (p.college ? ' from ' + p.college : ''), ago(p.created_at))); });
+      if (!(d.recent || []).length) rec.appendChild(li('Be the first to join!', ''));
+      var w = $('wanted'); w.textContent = '';
+      (d.wanted || []).forEach(function (s) { w.appendChild(li(s.skill, s.n + ' looking')); });
+      if (!(d.wanted || []).length) w.appendChild(li('Waiting for the first answers...', ''));
+      makeQr();
+    }).catch(function (e) { $('name').textContent = e.message; $('name').className = 'err'; });
+  }
+  load();
+  setInterval(load, 10000);
+})();
+</script>
+</body>
+</html>
