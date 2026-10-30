@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Event Matcher Admin</title>
+<style>
+  :root{--bg:#F2F5F8;--card:#fff;--ink:#13212C;--muted:#566574;--line:#D5DDE5;--accent:#2447D6;--bad:#B3261E}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  main{max-width:640px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
+  h1{font-size:24px;margin:0} h2{font-size:18px;margin:0} p{margin:0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
+  label{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
+  input{font:inherit;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:8px;width:100%}
+  button{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:#fff;padding:10px 16px;cursor:pointer}
+  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.danger{color:var(--bad);border-color:var(--bad)}
+  .row{display:flex;gap:8px;flex-wrap:wrap}
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .stat{border:1px solid var(--line);border-radius:10px;padding:12px;text-align:center}
+  .stat b{display:block;font-size:28px}
+  .muted{color:var(--muted);font-size:14px}
+  .err{color:var(--bad);font-weight:600;font-size:14px}
+  .ok{color:#1B7A4B;font-weight:600;font-size:14px}
+  table{border-collapse:collapse;width:100%;font-size:14px}
+  td,th{text-align:left;padding:6px 8px;border-top:1px solid var(--line)}
+  .scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<main>
+  <h1>Event Matcher Admin</h1>
+  <p class="muted">For organisers only. Do not share this page's admin key.</p>
+
+  <div class="card">
+    <label for="key">Admin key<input id="key" type="password" autocomplete="off"></label>
+    <label for="code">Event code<input id="code" type="text" placeholder="DEMO" autocapitalize="characters"></label>
+    <label for="ename">Event name (when creating)<input id="ename" type="text" placeholder="NIT Trichy Builders Meetup"></label>
+    <div class="row">
+      <button class="primary" id="create" type="button">Create or rename event</button>
+      <button id="load" type="button">Show live numbers</button>
+    </div>
+    <p id="msg" role="status"></p>
+  </div>
+
+  <div class="card" id="out" hidden>
+    <h2 id="title"></h2>
+    <div class="stats">
+      <div class="stat"><b id="n1">0</b><span class="muted">people joined</span></div>
+      <div class="stat"><b id="n2">0</b><span class="muted">interests sent</span></div>
+      <div class="stat"><b id="n3">0</b><span class="muted">mutual matches</span></div>
+    </div>
+    <div class="scroll"><table><thead><tr><th>Name</th><th>College</th><th>Role</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <p class="muted">Share link: <span id="link"></span></p>
+    <div class="row"><button class="danger" id="del" type="button">Delete this event's people</button></div>
+  </div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  var cfg = window.EMS_CONFIG || {};
+  var sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  var $ = function (id) { return document.getElementById(id); };
+  var armed = false;
+
+  function say(text, cls) { var m = $('msg'); m.textContent = text; m.className = cls || ''; }
+  function call(name, args) {
+    return sb.rpc(name, args).then(function (r) { if (r.error) throw new Error(r.error.message); return r.data; });
+  }
+  function td(text) { var c = document.createElement('td'); c.textContent = text || ''; return c; }
+
+  $('create').addEventListener('click', function () {
+    var code = $('code').value.trim(), name = $('ename').value.trim();
+    if (!code || !name) return say('Enter both an event code and an event name.', 'err');
+    call('admin_create_event', { p_key: $('key').value, p_code: code, p_name: name })
+      .then(function () { say('Event saved. Participants join at: ' + location.origin + location.pathname.replace('admin.html', '') + '?event=' + encodeURIComponent(code), 'ok'); })
+      .catch(function (e) { say(e.message, 'err'); });
+  });
+
+  function load() {
+    var code = $('code').value.trim();
+    if (!code) return say('Enter the event code.', 'err');
+    call('admin_overview', { p_key: $('key').value, p_event: code }).then(function (d) {
+      say('');
+      $('out').hidden = false;
+      $('title').textContent = 'Event ' + code;
+      $('n1').textContent = d.profiles; $('n2').textContent = d.interests; $('n3').textContent = d.mutual;
+      var tb = $('rows'); tb.textContent = '';
+      (d.recent || []).forEach(function (r) {
+        var tr = document.createElement('tr'); tr.appendChild(td(r.name)); tr.appendChild(td(r.college)); tr.appendChild(td(r.role)); tb.appendChild(tr);
+      });
+      $('link').textContent = location.origin + location.pathname.replace('admin.html', '') + '?event=' + encodeURIComponent(code);
+    }).catch(function (e) { say(e.message, 'err'); });
+  }
+  $('load').addEventListener('click', load);
+
+  $('del').addEventListener('click', function () {
+    var b = $('del');
+    if (!armed) { armed = true; b.textContent = 'Click again to delete everyone for this event'; return; }
+    armed = false; b.textContent = "Delete this event's people";
+    call('admin_delete_event_data', { p_key: $('key').value, p_event: $('code').value.trim() })
+      .then(function () { say('All people for this event were deleted.', 'ok'); load(); })
+      .catch(function (e) { say(e.message, 'err'); });
+  });
+})();
+</script>
+</body>
+</html>
