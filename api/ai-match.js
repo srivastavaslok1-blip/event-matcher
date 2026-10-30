@@ -5,7 +5,8 @@
 //   GEMINI_API_KEY     your key from Google AI Studio (aistudio.google.com)
 //   SUPABASE_URL       same value as in config.js
 //   SUPABASE_ANON_KEY  same public key as in config.js
-//   GEMINI_MODEL       optional, defaults to gemini-flash-latest
+//   GEMINI_MODEL       optional, defaults to gemini-flash-lite-latest (fast). If it is busy,
+//                      the function automatically tries gemini-flash-latest as a backup.
 //
 // If anything is missing or the AI fails, the app quietly keeps using the rule-based matches.
 
@@ -16,9 +17,12 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SB_URL = (process.env.SUPABASE_URL || '').trim().replace(/\/+$/, '');
 const SB_KEY = (process.env.SUPABASE_ANON_KEY || '').trim();
 const AI_KEY = (process.env.GEMINI_API_KEY || '').trim();
-const MODEL = (process.env.GEMINI_MODEL || 'gemini-flash-latest').trim();
-const AI_URL = process.env.GEMINI_ENDPOINT ||
-  'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(MODEL) + ':generateContent';
+const MODEL = (process.env.GEMINI_MODEL || 'gemini-flash-lite-latest').trim();
+const MODELS = [MODEL, 'gemini-flash-latest'].filter((m, i, a) => a.indexOf(m) === i);
+function modelUrl(m) {
+  return process.env.GEMINI_ENDPOINT ||
+    'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(m) + ':generateContent';
+}
 
 const INSTRUCTIONS = [
   'You are the matchmaking engine at a live, in-person networking event in India.',
@@ -51,43 +55,65 @@ function describe(p) {
     wants: (p.intent || []).slice(0, 7),
     needs_skills: (p.need_skills || []).slice(0, 8),
     offers_skills: (p.offer_skills || []).slice(0, 8),
-    wants_to_meet: clip(p.looking_text, 220),
-    can_help_with: clip(p.offer_text, 220),
-    building: clip(p.project, 220)
+    wants_to_meet: clip(p.looking_text, 180),
+    can_help_with: clip(p.offer_text, 180),
+    building: clip(p.project, 180)
   };
 }
 
-async function askAI(me, pool) {
-  const payload = { ME: describe(me), attendees: pool.map((p, i) => Object.assign({ ref: 'P' + (i + 1) }, describe(p))) };
+async function callModel(url, reqBody, ms) {
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20000);
+  const timer = setTimeout(() => ctrl.abort(), ms);
   try {
-    const reqBody = JSON.stringify({
-      systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-      contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
-      generationConfig: { temperature: 0.4, maxOutputTokens: 4096, responseMimeType: 'application/json' }
-    });
     // Send the key in the x-goog-api-key header. Some newer "AQ." keys have been reported to fail that way,
     // so if Google says the key is not accepted, try once more with the key in the URL instead.
-    let r = await fetch(AI_URL, {
+    let r = await fetch(url, {
       method: 'POST', signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json', 'x-goog-api-key': AI_KEY }, body: reqBody
     });
     if (r.status === 401 || r.status === 403) {
-      r = await fetch(AI_URL + (AI_URL.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(AI_KEY), {
+      r = await fetch(url + (url.includes('?') ? '&' : '?') + 'key=' + encodeURIComponent(AI_KEY), {
         method: 'POST', signal: ctrl.signal, headers: { 'Content-Type': 'application/json' }, body: reqBody
       });
     }
     const data = await r.json().catch(() => null);
-    if (!r.ok) throw new Error('AI error ' + r.status + ': ' + clip(data && data.error && data.error.message, 200));
+    if (!r.ok) {
+      const err = new Error('AI error ' + r.status + ': ' + clip(data && data.error && data.error.message, 160));
+      err.retry = r.status === 404 || r.status === 429 || r.status >= 500;
+      throw err;
+    }
     const parts = (((data || {}).candidates || [])[0] || {}).content;
     const text = ((parts && parts.parts) || []).map(x => x.text || '').join('');
     const m = text.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('AI returned no JSON');
+    if (!m) { const e = new Error('AI returned no JSON'); e.retry = true; throw e; }
     return JSON.parse(m[0]);
+  } catch (e) {
+    if (e && e.name === 'AbortError') { const t = new Error('AI took too long (' + ms / 1000 + 's)'); t.retry = true; throw t; }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function askAI(me, pool) {
+  const payload = { ME: describe(me), attendees: pool.map((p, i) => Object.assign({ ref: 'P' + (i + 1) }, describe(p))) };
+  const reqBody = JSON.stringify({
+    systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+    contents: [{ role: 'user', parts: [{ text: JSON.stringify(payload) }] }],
+    generationConfig: { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: 'application/json' }
+  });
+  // Try the fast model first. If Google is busy (503), rate-limited (429) or slow, try the backup model once.
+  const budgets = [15000, 11000];
+  let lastErr = null;
+  for (let i = 0; i < MODELS.length && i < budgets.length; i++) {
+    try {
+      return await callModel(modelUrl(MODELS[i]), reqBody, budgets[i]);
+    } catch (e) {
+      lastErr = new Error(MODELS[i] + ': ' + (e && e.message));
+      if (!e || !e.retry) break;
+    }
+  }
+  throw lastErr;
 }
 
 // Safety net: if the AI still writes "P3", swap in that person's first name.
@@ -133,12 +159,12 @@ module.exports = async function handler(req, res) {
     const cands = (state && state.cands) || [];
     if (!cands.length) return res.status(200).json({ status: 'empty', matches: [] });
 
-    // Send the AI the 25 best rule-based fits plus the newest others, up to 50 people.
+    // Send the AI the 20 best rule-based fits plus the newest others, up to 30 people.
     const scored = cands.map(c => ({ c, s: MATCH.score(self, c).score }));
     const pool = [];
     const seen = new Set();
-    scored.slice().sort((a, b) => b.s - a.s).slice(0, 25).forEach(x => { pool.push(x.c); seen.add(x.c.id); });
-    for (const x of scored) { if (pool.length >= 50) break; if (!seen.has(x.c.id)) { pool.push(x.c); seen.add(x.c.id); } }
+    scored.slice().sort((a, b) => b.s - a.s).slice(0, 20).forEach(x => { pool.push(x.c); seen.add(x.c.id); });
+    for (const x of scored) { if (pool.length >= 30) break; if (!seen.has(x.c.id)) { pool.push(x.c); seen.add(x.c.id); } }
 
     const sig = crypto.createHash('sha1').update(MODEL + '|' + pool.map(p => p.id).sort().join(',')).digest('hex');
     const gate = await rpc('ai_begin', { p_me: me, p_sig: sig });
