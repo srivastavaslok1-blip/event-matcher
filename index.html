@@ -93,6 +93,14 @@
     alertsOn: false, waveOpen: null
   };
   try { S.alertsOn = localStorage.getItem(LS_ALERTS) === '1'; } catch (e) {}
+  function resetState() {
+    S.me = null; S.cands = []; S.sent = {}; S.mutuals = []; S.waves = []; S.incoming = 0;
+    S.tab = 'matches'; S.timer = null; S.synced = false;
+    S.seenCands = {}; S.seenMutuals = {}; S.seenWaves = {}; S.unreadWaves = 0;
+    S.banners = []; S.unread = 0; S.waveOpen = null; S.leaveArmed = false;
+    S.ai = { matches: null, status: 'idle', lastAsk: 0, lastCount: -1, busy: false };
+    updateTitle();
+  }
 
   // ---------- helpers ----------
   function h(tag, attrs) {
@@ -327,7 +335,7 @@
     if (S.timer) clearTimeout(S.timer);
     (function loop() {
       S.timer = setTimeout(function () {
-        if (S.me) syncNow(false).catch(function () {}).then(loop); else loop();
+        if (S.me) syncNow(false).catch(function () {}).then(function () { if (S.me) loop(); });
       }, document.hidden ? 45000 : 15000);
     })();
   }
@@ -532,9 +540,16 @@
       } }));
 
     var body = S.tab === 'matches' ? matchesView() : connectionsView();
-    var leave = h('button', { type: 'button', text: 'Leave this event', onclick: function () {
-      try { localStorage.removeItem(LS_ID); } catch (e) {}
-      S.me = null; if (S.timer) clearTimeout(S.timer); screenCode();
+    var leave = h('button', { type: 'button', text: S.leaveArmed ? 'Tap again to leave and delete your profile' : 'Leave this event', onclick: function () {
+      if (!S.leaveArmed) { S.leaveArmed = true; screenMain(); return; }
+      var id = S.me.id;
+      rpc('leave_event', { p_me: id }).catch(function () {}).then(function () {
+        try { localStorage.removeItem(LS_ID); } catch (e) {}
+        if (S.timer) clearTimeout(S.timer);
+        resetState();
+        screenCode();
+        toast('You left the event. Your profile and connections were deleted.');
+      });
     } });
     var foot = h('p', { class: 'muted small', text: S.ai.status === 'ready' ? 'Matches picked by AI from what everyone wrote.' : 'Matches use clear rules while AI picks are unavailable.' });
     render([head, bannersView(), alertsCard(), tabs].concat(body, [leave, foot]));
