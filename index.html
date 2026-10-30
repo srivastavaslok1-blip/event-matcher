@@ -3,16 +3,19 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#2447D6">
 <title>Event Matcher</title>
 <style>
-  :root{--bg:#F2F5F8;--card:#fff;--ink:#13212C;--muted:#566574;--line:#D5DDE5;--accent:#2447D6;--accent-soft:#E6ECFB;--ok:#1B7A4B;--ok-soft:#DDF3E8;--bad:#B3261E}
+  :root{--bg:#F2F5F8;--card:#fff;--ink:#13212C;--muted:#566574;--line:#D5DDE5;--accent:#2447D6;--accent-soft:#E6ECFB;--ok:#1B7A4B;--ok-soft:#DDF3E8;--warn:#8A5A00;--warn-soft:#FFF3D6;--bad:#B3261E}
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
   main{max-width:640px;margin:0 auto;padding:20px 16px 80px;display:flex;flex-direction:column;gap:16px}
   h1{font-size:26px;line-height:1.15;margin:0}
   h2{font-size:19px;margin:0}
+  h3{font-size:16px;margin:0}
   p{margin:0}
   .muted{color:var(--muted);font-size:14px}
+  .small{font-size:13px}
   .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;gap:12px}
   label.f{display:flex;flex-direction:column;gap:4px;font-weight:600;font-size:14px}
   input[type=text],input[type=tel],input[type=url],select,textarea{font:inherit;font-weight:400;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink);width:100%}
@@ -25,20 +28,35 @@
   .chip span{display:inline-block;padding:7px 12px;border:1px solid var(--line);border-radius:999px;font-size:14px;background:#fff}
   .chip input:checked + span{background:var(--accent);border-color:var(--accent);color:#fff}
   .chip input:focus-visible + span{outline:3px solid var(--accent);outline-offset:2px}
-  button{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 16px;cursor:pointer}
-  button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button,.btn{font:inherit;font-weight:600;border-radius:10px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:10px 16px;cursor:pointer;text-align:center;text-decoration:none;display:inline-block}
+  button.primary,.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  button.green,.btn.green{background:var(--ok);border-color:var(--ok);color:#fff}
+  button.pill{padding:6px 12px;font-size:14px;border-radius:999px;font-weight:500}
   button:disabled{opacity:.6;cursor:default}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   .between{justify-content:space-between}
+  .grow{flex:1}
   .tabs{display:flex;gap:8px}
-  .tabs button{flex:1}
+  .tabs button{flex:1;position:relative}
   .tabs button.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .dot{position:absolute;top:6px;right:8px;width:9px;height:9px;border-radius:50%;background:var(--bad)}
   .match h2{font-size:18px}
   .why{margin:0;padding-left:18px;font-size:14px;display:flex;flex-direction:column;gap:2px}
   .tag{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:600}
+  .fit{display:inline-block;background:var(--ok-soft);color:var(--ok);border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700}
+  .ai-reason{font-weight:600}
+  .opener{background:var(--bg);border-left:3px solid var(--accent);padding:8px 10px;border-radius:6px;font-size:14px}
   .sent{background:var(--ok-soft);color:var(--ok);border-color:var(--ok-soft)}
   .err{color:var(--bad);font-size:14px;font-weight:600}
   .toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;max-width:90%;z-index:5}
+  .banner{background:var(--warn-soft);border:1px solid #F0D58C;color:#4A3300;border-radius:12px;padding:12px 14px;display:flex;gap:10px;align-items:flex-start}
+  .banner.good{background:var(--ok-soft);border-color:#A8DCC0;color:#0E3F27}
+  .banner p{flex:1;font-size:14px}
+  .banner button{padding:4px 10px;font-size:13px}
+  .spot{background:var(--accent-soft);border-radius:8px;padding:8px 10px;font-size:14px}
+  .wave-list{display:flex;flex-direction:column;gap:6px}
+  .status{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px}
+  .live{width:8px;height:8px;border-radius:50%;background:var(--ok);display:inline-block}
   a{color:var(--accent)}
   .check{display:flex;gap:10px;align-items:flex-start;font-size:14px}
   .check input{margin-top:3px;width:18px;height:18px;flex:none}
@@ -55,15 +73,26 @@
   var cfg = window.EMS_CONFIG || {};
   var app = document.getElementById('app');
   var LS_ID = 'ems_profile_id';
+  var LS_ALERTS = 'ems_alerts_on';
 
   var SKILLS = ['Coding', 'AI / ML', 'Design', 'Marketing / sales', 'Business / strategy', 'Finance', 'Hardware / electronics', 'Content / video'];
   var ROLES = ['Student', 'Founder', 'Mentor', 'Investor', 'Professional'];
   var INTENTS = ['Find a co-founder', 'Find hackathon teammates', 'Find a mentor', 'Find clients / customers', 'Find investors', 'Find internship / job', 'Just meet good people'];
+  var SPOTS = ['Near the entrance', 'Near the stage', 'At the food counter', 'Outside, near the gate'];
+  var WAVE_NOTES = ['I am coming to you', 'Where are you?', 'Meet at the entrance?', 'Hi! Free to talk now?'];
 
   var sb = null;
   try { sb = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY); } catch (e) { sb = null; }
 
-  var S = { me: null, cands: [], sent: {}, mutuals: [], tab: 'matches', timer: null };
+  var S = {
+    me: null, cands: [], sent: {}, mutuals: [], waves: [], incoming: 0,
+    tab: 'matches', timer: null, synced: false,
+    seenCands: {}, seenMutuals: {}, seenWaves: {}, unreadWaves: 0,
+    banners: [], unread: 0,
+    ai: { matches: null, status: 'idle', lastAsk: 0, lastCount: -1, busy: false },
+    alertsOn: false, waveOpen: null
+  };
+  try { S.alertsOn = localStorage.getItem(LS_ALERTS) === '1'; } catch (e) {}
 
   // ---------- helpers ----------
   function h(tag, attrs) {
@@ -83,11 +112,11 @@
     }
     return el;
   }
-  function render() { app.textContent = ''; for (var i = 0; i < arguments.length; i++) app.appendChild(arguments[i]); }
+  function render(nodes) { app.textContent = ''; nodes.forEach(function (n) { if (n) app.appendChild(n); }); }
   function toast(msg) {
     var t = h('div', { class: 'toast', role: 'status', text: msg });
     document.body.appendChild(t);
-    setTimeout(function () { t.remove(); }, 3200);
+    setTimeout(function () { t.remove(); }, 3500);
   }
   function rpc(name, args) {
     return sb.rpc(name, args || {}).then(function (r) {
@@ -102,11 +131,58 @@
     try { var x = new URL(u); return (x.protocol === 'http:' || x.protocol === 'https:') ? x.href : ''; } catch (e) { return ''; }
   }
   function digits(s) { return String(s || '').replace(/\D/g, ''); }
+  function ago(ts) {
+    if (!ts) return '';
+    var s = Math.max(0, (Date.now() - new Date(ts).getTime()) / 1000);
+    if (s < 60) return 'just now';
+    if (s < 3600) return Math.floor(s / 60) + ' min ago';
+    return Math.floor(s / 3600) + ' h ago';
+  }
+  function firstName(n) { return String(n || '').trim().split(/\s+/)[0]; }
 
-  // ---------- screens ----------
+  // ---------- alerts ----------
+  function notificationsSupported() { return 'Notification' in window; }
+  function updateTitle() { document.title = (S.unread ? '(' + S.unread + ') ' : '') + 'Event Matcher'; }
+  function beep() {
+    try {
+      var C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+      var ctx = beep.ctx || (beep.ctx = new C());
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.frequency.value = 880; g.gain.value = 0.08; o.connect(g); g.connect(ctx.destination);
+      o.start(); o.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+  }
+  function alertUser(title, body, good) {
+    S.banners.unshift({ id: Date.now() + Math.random(), title: title, body: body, good: !!good });
+    S.banners = S.banners.slice(0, 3);
+    if (document.hidden) { S.unread++; updateTitle(); }
+    toast(title);
+    if (S.alertsOn) {
+      beep();
+      try { if (navigator.vibrate) navigator.vibrate([150, 80, 150]); } catch (e) {}
+      if (document.hidden && notificationsSupported() && Notification.permission === 'granted') {
+        try { new Notification(title, { body: body, tag: 'ems-' + title }); } catch (e) {}
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) { S.unread = 0; updateTitle(); if (S.me) syncNow(false); }
+  });
+  function enableAlerts() {
+    S.alertsOn = true;
+    try { localStorage.setItem(LS_ALERTS, '1'); } catch (e) {}
+    beep();
+    if (notificationsSupported() && Notification.permission === 'default') {
+      Notification.requestPermission().then(function () { screenMain(); });
+    }
+    toast('Alerts are on. Keep this page open during the event.');
+    screenMain();
+  }
+
+  // ---------- setup screens ----------
   function screenSetup() {
-    render(h('div', { class: 'card' }, h('h1', { text: 'Almost there' }),
-      h('p', { text: 'The app is not connected to its database yet. Open config.js and paste your Supabase URL and public key.' })));
+    render([h('div', { class: 'card' }, h('h1', { text: 'Almost there' }),
+      h('p', { text: 'The app is not connected to its database yet. Open config.js and paste your Supabase URL and public key.' }))]);
   }
 
   function screenCode(msg) {
@@ -124,9 +200,9 @@
     }
     btn.addEventListener('click', go);
     input.addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); });
-    render(h('h1', { text: 'Meet the right people at this event' }),
-      h('p', { class: 'muted', text: 'Tell us what you are looking for. We will show the few people worth talking to.' }),
-      h('div', { class: 'card' }, h('label', { class: 'f', for: 'code' }, 'Event code', input), err, btn));
+    render([h('h1', { text: 'Meet the right people at this event' }),
+      h('p', { class: 'muted', text: 'Tell us what you are looking for. AI picks the few people worth talking to, and alerts you when a good match walks in.' }),
+      h('div', { class: 'card' }, h('label', { class: 'f', for: 'code' }, 'Event code', input), err, btn)]);
   }
 
   function chipGroup(name, options) {
@@ -172,9 +248,9 @@
       }).catch(function (e) { err.textContent = e.message; btn.disabled = false; btn.textContent = 'Show me who to meet'; });
     });
 
-    render(
+    render([
       h('h1', { text: ev.name }),
-      h('p', { class: 'muted', text: 'Two minutes. Your answers decide who you are matched with.' }),
+      h('p', { class: 'muted', text: ev.tagline || 'Two minutes. Your answers decide who you are matched with.' }),
       h('div', { class: 'card' },
         field('name', 'Your name', h('input', { type: 'text', id: 'name', autocomplete: 'name' })),
         field('college', 'College or company', h('input', { type: 'text', id: 'college' })),
@@ -185,15 +261,16 @@
         h('fieldset', null, h('legend', { text: 'Skills I am looking for in other people' }), chipGroup('need', SKILLS)),
         h('fieldset', null, h('legend', { text: 'Skills I can offer' }), chipGroup('offer', SKILLS))),
       h('div', { class: 'card' },
+        h('p', { class: 'muted', text: 'Write these in your own words. The AI reads them to find the right people, so be specific.' }),
         field('looking', 'In one line, who do you most want to meet?', h('textarea', { id: 'looking', maxlength: '300', placeholder: 'e.g. A backend developer for my food-delivery idea' })),
-        field('offertext', 'In one line, what can you help others with?', h('textarea', { id: 'offertext', maxlength: '300' })),
+        field('offertext', 'In one line, what can you help others with?', h('textarea', { id: 'offertext', maxlength: '300', placeholder: 'e.g. UI design and Figma prototypes' })),
         field('project', 'What are you building or want to build?', h('textarea', { id: 'project', maxlength: '300' })),
         field('link', 'LinkedIn or GitHub link (optional)', h('input', { type: 'url', id: 'link', placeholder: 'linkedin.com/in/yourname' }))),
       h('div', { class: 'card' },
         h('div', { class: 'check' }, consent,
-          h('label', { for: 'consent', text: 'I agree that my answers are shown to other people at this event, and my WhatsApp number only to someone I am matched with when we both say yes. My data is deleted after the event.' })),
+          h('label', { for: 'consent', text: 'I agree that my answers are shown to other people at this event and to the organiser (name, college, role and answers, not my number). My answers without my name or number are analysed by an AI service (Google Gemini) to suggest matches. My WhatsApp number is shown only to someone I match with when we both say yes. My data is deleted after the event.' })),
         err, btn)
-    );
+    ]);
   }
 
   // ---------- data ----------
@@ -201,46 +278,179 @@
     return rpc('get_me', { p_me: id }).then(function (rows) {
       if (!rows || !rows.length) { try { localStorage.removeItem(LS_ID); } catch (e) {} throw new Error('Profile not found'); }
       S.me = rows[0];
-      return refresh(true);
+      return syncNow(true);
     });
-  }
-  function refresh(first) {
-    return Promise.all([
-      rpc('list_candidates', { p_me: S.me.id }),
-      rpc('my_interests', { p_me: S.me.id }),
-      rpc('get_mutuals', { p_me: S.me.id })
-    ]).then(function (r) {
-      S.cands = r[0] || [];
-      S.sent = {}; (r[1] || []).forEach(function (x) { S.sent[x.to_id] = true; });
-      S.mutuals = r[2] || [];
-      screenMain();
-      if (first) startPolling();
-    });
-  }
-  function startPolling() {
-    if (S.timer) clearInterval(S.timer);
-    S.timer = setInterval(function () { if (!document.hidden && S.me) refresh(false).catch(function () {}); }, 30000);
   }
 
-  // ---------- main screen ----------
-  function personCard(item, mutual) {
-    var p = item.person || item;
+  function applySync(d, first) {
+    var cands = d.cands || [], mutuals = d.mutuals || [], waves = d.waves || [];
+    if (!first) {
+      // Live alerts: new strong match joined, new mutual connection, wave received, someone interested.
+      var mutualIds = {}; mutuals.forEach(function (m) { mutualIds[m.id] = true; });
+      cands.forEach(function (c) {
+        if (S.seenCands[c.id] || mutualIds[c.id]) return;
+        var r = window.EMS_MATCH.score(S.me, c);
+        if (r.score >= 3) alertUser('New match just joined: ' + c.name, (c.role || '') + (r.why[0] ? '. ' + r.why[0] : ''), false);
+      });
+      mutuals.forEach(function (m) {
+        if (!S.seenMutuals[m.id]) alertUser('It is mutual with ' + m.name + '!', 'You can now message them on WhatsApp and see where they are.', true);
+      });
+      waves.forEach(function (w) {
+        if (!S.seenWaves[w.id]) { S.unreadWaves++; alertUser(firstName(w.from_name) + ' waved at you', w.note || 'Say hi!', true); }
+      });
+      if ((d.incoming || 0) > S.incoming) {
+        alertUser('Someone new is interested in you', 'Tap "I am interested" on people you like. If it is them, you connect.', false);
+      }
+    }
+    cands.forEach(function (c) { S.seenCands[c.id] = true; });
+    mutuals.forEach(function (m) { S.seenMutuals[m.id] = true; });
+    waves.forEach(function (w) { S.seenWaves[w.id] = true; });
+    S.cands = cands;
+    S.sent = {}; (d.sent || []).forEach(function (id) { S.sent[id] = true; });
+    S.mutuals = mutuals;
+    S.waves = waves;
+    S.incoming = d.incoming || 0;
+    S.synced = true;
+  }
+
+  function syncNow(first) {
+    if (!S.me) return Promise.resolve();
+    return rpc('sync', { p_me: S.me.id }).then(function (d) {
+      applySync(d || {}, first);
+      screenMain();
+      if (first) startPolling();
+      maybeAskAI();
+    });
+  }
+
+  function startPolling() {
+    if (S.timer) clearTimeout(S.timer);
+    (function loop() {
+      S.timer = setTimeout(function () {
+        if (S.me) syncNow(false).catch(function () {}).then(loop); else loop();
+      }, document.hidden ? 45000 : 15000);
+    })();
+  }
+
+  // ---------- AI ----------
+  function maybeAskAI(force) {
+    if (!S.me || S.ai.busy || !S.cands.length) return;
+    if (S.ai.status === 'off' && !force) return;
+    var now = Date.now();
+    var changed = S.cands.length !== S.ai.lastCount;
+    if (!force && !changed && S.ai.matches !== null) return;
+    if (!force && now - S.ai.lastAsk < 45000 && S.ai.status !== 'idle') return;
+    S.ai.busy = true; S.ai.lastAsk = now;
+    var count = S.cands.length;
+    if (S.ai.matches === null && S.ai.status === 'idle') { S.ai.status = 'loading'; screenMain(); }
+    fetch('api/ai-match', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ me: S.me.id }) })
+      .then(function (r) { return r.ok ? r.json() : { status: 'error', matches: null }; })
+      .catch(function () { return { status: 'error', matches: null }; })
+      .then(function (d) {
+        S.ai.busy = false;
+        if (d && Array.isArray(d.matches)) { S.ai.matches = d.matches; S.ai.lastCount = count; S.ai.status = 'ready'; }
+        else if (S.ai.matches === null) { S.ai.status = (d && d.status === 'off') ? 'off' : 'unavailable'; S.ai.lastCount = count; }
+        screenMain();
+      });
+  }
+
+  // ---------- main screen pieces ----------
+  function bannersView() {
+    if (!S.banners.length) return null;
+    var wrap = h('div', { style: 'display:flex;flex-direction:column;gap:8px' });
+    S.banners.forEach(function (b) {
+      wrap.appendChild(h('div', { class: 'banner' + (b.good ? ' good' : ''), role: 'status' },
+        h('p', null, h('strong', { text: b.title }), b.body ? h('span', { text: ' ' + b.body }) : null),
+        h('button', { type: 'button', text: 'OK', 'aria-label': 'Dismiss', onclick: function () {
+          S.banners = S.banners.filter(function (x) { return x.id !== b.id; }); screenMain();
+        } })));
+    });
+    return wrap;
+  }
+
+  function alertsCard() {
+    if (S.alertsOn) {
+      var blocked = notificationsSupported() && Notification.permission === 'denied';
+      return h('p', { class: 'status' }, h('span', { class: 'live', 'aria-hidden': 'true' }),
+        blocked ? 'Live alerts on inside this page (phone notifications are blocked in your browser settings).'
+                : 'Live alerts on. We will tell you when a good match joins, waves or says yes.');
+    }
+    return h('div', { class: 'card' },
+      h('h3', { text: 'Get alerted when the right person walks in' }),
+      h('p', { class: 'muted', text: 'Keep this page open. We will buzz you when someone who fits you joins, when it is mutual, or when a connection waves.' }),
+      h('button', { type: 'button', class: 'primary', text: 'Turn on live alerts', onclick: enableAlerts }));
+  }
+
+  function spotCard() {
+    var input = h('input', { type: 'text', id: 'spot', maxlength: '120', placeholder: 'e.g. Black hoodie, table 4', value: S.me.spot_text || '' });
+    var save = h('button', { type: 'button', text: 'Save' });
+    function saveSpot(text) {
+      save.disabled = true;
+      rpc('update_spot', { p_me: S.me.id, p_text: text }).then(function () {
+        S.me.spot_text = text; toast('Saved. Your connections can now find you.'); screenMain();
+      }).catch(function (e) { toast(e.message); save.disabled = false; });
+    }
+    save.addEventListener('click', function () { saveSpot(input.value.trim()); });
+    var chips = h('div', { class: 'row' });
+    SPOTS.forEach(function (s) {
+      chips.appendChild(h('button', { type: 'button', class: 'pill', text: s, onclick: function () {
+        var extra = input.value.trim(); var base = extra && SPOTS.indexOf(extra) === -1 ? extra.split(',')[0] + ', ' : '';
+        saveSpot((base ? base + s.charAt(0).toLowerCase() + s.slice(1) : s).slice(0, 120));
+      } }));
+    });
+    return h('div', { class: 'card' },
+      h('h3', { text: 'Help your connections find you in the room' }),
+      h('label', { class: 'f', for: 'spot' }, 'What are you wearing or where are you?', h('div', { class: 'row' }, h('div', { class: 'grow' }, input), save)),
+      chips,
+      h('p', { class: 'muted small', text: 'Only people you have connected with can see this.' }));
+  }
+
+  function aiById() {
+    var m = {}; (S.ai.matches || []).forEach(function (x) { m[x.id] = x; }); return m;
+  }
+
+  function personCard(p, opts) {
+    opts = opts || {};
     var card = h('div', { class: 'card match' },
-      h('div', { class: 'row between' }, h('h2', { text: p.name }), h('span', { class: 'tag', text: p.role })),
+      h('div', { class: 'row between' }, h('h2', { text: p.name }),
+        h('div', { class: 'row' }, opts.fit ? h('span', { class: 'fit', text: opts.fit + '% fit' }) : null, h('span', { class: 'tag', text: p.role }))),
       p.college ? h('p', { class: 'muted', text: p.college }) : null);
-    if (item.why && item.why.length) {
+    if (opts.ai) {
+      card.appendChild(h('p', { class: 'ai-reason', text: opts.ai.reason }));
+      if (opts.ai.opener) card.appendChild(h('p', { class: 'opener' }, h('span', { class: 'muted small', text: 'Start with: ' }), '"' + opts.ai.opener + '"'));
+    } else if (opts.why && opts.why.length) {
       var ul = h('ul', { class: 'why' });
-      item.why.forEach(function (w) { ul.appendChild(h('li', { text: w })); });
+      opts.why.forEach(function (w) { ul.appendChild(h('li', { text: w })); });
       card.appendChild(h('div', null, h('p', { class: 'muted', text: 'Why you two:' }), ul));
     }
     if (p.project) card.appendChild(h('p', { text: 'Building: ' + p.project }));
-    if (p.looking_text) card.appendChild(h('p', { class: 'muted', text: 'Looking for: ' + p.looking_text }));
+    if (p.looking_text && !opts.mutual) card.appendChild(h('p', { class: 'muted', text: 'Looking for: ' + p.looking_text }));
     var url = safeUrl(p.link);
     if (url) card.appendChild(h('p', null, h('a', { href: url, target: '_blank', rel: 'noopener noreferrer', text: 'Profile link' })));
-    if (mutual) {
-      var num = digits(p.whatsapp);
-      card.appendChild(h('a', { class: 'primary', href: 'https://wa.me/' + num, target: '_blank', rel: 'noopener noreferrer',
-        style: 'text-align:center;text-decoration:none;padding:10px 16px;border-radius:10px;background:#1B7A4B;color:#fff;font-weight:600', text: 'Message on WhatsApp' }));
+
+    if (opts.mutual) {
+      card.appendChild(p.spot_text
+        ? h('p', { class: 'spot' }, h('strong', { text: 'Find them: ' }), p.spot_text, h('span', { class: 'muted small', text: ' (' + ago(p.spot_at) + ')' }))
+        : h('p', { class: 'muted small', text: 'They have not shared where they are yet. Send a wave to ask.' }));
+      var actions = h('div', { class: 'row' },
+        h('a', { class: 'btn green grow', href: 'https://wa.me/' + digits(p.whatsapp), target: '_blank', rel: 'noopener noreferrer', text: 'WhatsApp' }),
+        h('button', { type: 'button', class: 'grow', text: S.waveOpen === p.id ? 'Close' : 'Wave', onclick: function () {
+          S.waveOpen = S.waveOpen === p.id ? null : p.id; screenMain();
+        } }));
+      card.appendChild(actions);
+      if (S.waveOpen === p.id) {
+        var notes = h('div', { class: 'row' });
+        WAVE_NOTES.forEach(function (n) {
+          notes.appendChild(h('button', { type: 'button', class: 'pill', text: n, onclick: function (e) {
+            e.target.disabled = true;
+            var note = n + (S.me.spot_text && n !== 'Where are you?' ? ' (I am: ' + S.me.spot_text + ')' : '');
+            rpc('send_wave', { p_me: S.me.id, p_to: p.id, p_note: note }).then(function () {
+              S.waveOpen = null; toast('Wave sent to ' + firstName(p.name)); screenMain();
+            }).catch(function (er) { toast(er.message); e.target.disabled = false; });
+          } }));
+        });
+        card.appendChild(notes);
+      }
     } else {
       var already = !!S.sent[p.id];
       var b = h('button', { type: 'button', class: already ? 'sent' : 'primary', text: already ? 'Interest sent' : 'I am interested', disabled: already });
@@ -248,11 +458,10 @@
         b.disabled = true; b.textContent = 'Sending...';
         rpc('express_interest', { p_me: S.me.id, p_to: p.id }).then(function () {
           S.sent[p.id] = true;
-          return rpc('get_mutuals', { p_me: S.me.id });
-        }).then(function (m) {
-          var before = S.mutuals.length; S.mutuals = m || [];
-          if (S.mutuals.length > before) { toast('It is mutual! Open Connections.'); } else { toast('Sent. You will see their number if they say yes too.'); }
-          screenMain();
+          return syncNow(false);
+        }).then(function () {
+          if (S.seenMutuals[p.id]) { S.tab = 'connections'; screenMain(); }
+          else toast('Sent. You will see their number if they say yes too.');
         }).catch(function (e) { toast(e.message); b.disabled = false; b.textContent = 'I am interested'; });
       });
       card.appendChild(b);
@@ -260,41 +469,76 @@
     return card;
   }
 
-  function screenMain() {
-    var ranked = window.EMS_MATCH.rank(S.me, S.cands, 5);
+  function matchesView() {
+    var out = [];
     var mutualIds = {}; S.mutuals.forEach(function (m) { mutualIds[m.id] = true; });
-    var shown = ranked.filter(function (r) { return !mutualIds[r.person.id]; });
+    var byId = {}; S.cands.forEach(function (c) { byId[c.id] = c; });
 
-    var tabs = h('div', { class: 'tabs' },
-      h('button', { type: 'button', class: S.tab === 'matches' ? 'on' : '', text: 'Your matches', onclick: function () { S.tab = 'matches'; screenMain(); } }),
-      h('button', { type: 'button', class: S.tab === 'connections' ? 'on' : '', text: 'Connections (' + S.mutuals.length + ')', onclick: function () { S.tab = 'connections'; screenMain(); } }));
-
-    var head = h('div', { class: 'row between' },
-      h('div', null, h('h1', { text: S.me.event_name }), h('p', { class: 'muted', text: 'Signed in as ' + S.me.name + '. ' + (S.cands.length + 1) + ' people here.' })),
-      h('button', { type: 'button', text: 'Refresh', onclick: function () { refresh(false).then(function () { toast('Updated'); }).catch(function (e) { toast(e.message); }); } }));
-
-    var body = [];
-    if (S.tab === 'matches') {
-      if (!shown.length) {
-        body.push(h('div', { class: 'card' }, h('h2', { text: 'No strong matches yet' }),
-          h('p', { text: S.cands.length ? 'Nobody here fits what you asked for so far. More people join every few minutes. Tap Refresh later.' : 'You are the first one here. Share the event QR code so others can join.' })));
-      } else {
-        body.push(h('p', { class: 'muted', text: shown.length === 1 ? 'The best fit for what you asked for:' : 'The ' + shown.length + ' best fits for what you asked for:' }));
-        shown.forEach(function (r) { body.push(personCard(r, false)); });
-      }
-    } else {
-      if (!S.mutuals.length) {
-        body.push(h('div', { class: 'card' }, h('h2', { text: 'No connections yet' }),
-          h('p', { text: 'When you and someone else both tap "I am interested", their WhatsApp number appears here.' })));
-      } else {
-        S.mutuals.forEach(function (m) { body.push(personCard({ person: m, why: [] }, true)); });
+    if (S.ai.matches && S.ai.matches.length) {
+      var picks = S.ai.matches.filter(function (x) { return byId[x.id] && !mutualIds[x.id]; });
+      if (picks.length) {
+        out.push(h('p', { class: 'muted', text: 'AI picked ' + (picks.length === 1 ? 'the one person' : 'these ' + picks.length + ' people') + ' for you, from ' + S.cands.length + ' here:' }));
+        picks.forEach(function (x) { out.push(personCard(byId[x.id], { ai: x, fit: x.score })); });
+        if (S.ai.busy) out.push(h('p', { class: 'muted small', text: 'Updating your picks...' }));
+        return out;
       }
     }
+
+    var ranked = window.EMS_MATCH.rank(S.me, S.cands, 5).filter(function (r) { return !mutualIds[r.person.id]; });
+    if (!ranked.length) {
+      out.push(h('div', { class: 'card' }, h('h2', { text: 'No strong matches yet' }),
+        h('p', { text: S.cands.length ? 'Nobody here fits what you asked for so far. Turn on live alerts and we will tell you when someone good joins.' : 'You are the first one here. Share the event QR code so others can join.' })));
+    } else {
+      out.push(h('p', { class: 'muted', text: ranked.length === 1 ? 'The best fit for what you asked for:' : 'The ' + ranked.length + ' best fits for what you asked for:' }));
+      ranked.forEach(function (r) { out.push(personCard(r.person, { why: r.why })); });
+    }
+    if (S.ai.status === 'loading' || S.ai.busy) out.push(h('p', { class: 'muted small', text: 'AI is reading everyone\'s answers to improve these picks...' }));
+    return out;
+  }
+
+  function connectionsView() {
+    var out = [];
+    S.unreadWaves = 0;
+    if (S.waves.length) {
+      var list = h('div', { class: 'wave-list' });
+      S.waves.slice(0, 5).forEach(function (w) {
+        list.appendChild(h('p', null, h('strong', { text: firstName(w.from_name) + ' waved: ' }), w.note || 'Hi!', h('span', { class: 'muted small', text: ' (' + ago(w.created_at) + ')' })));
+      });
+      out.push(h('div', { class: 'card' }, h('h3', { text: 'Waves' }), list));
+    }
+    if (!S.mutuals.length) {
+      out.push(h('div', { class: 'card' }, h('h2', { text: 'No connections yet' }),
+        h('p', { text: 'When you and someone else both tap "I am interested", they appear here with their WhatsApp and where to find them.' })));
+    } else {
+      S.mutuals.forEach(function (m) { out.push(personCard(m, { mutual: true })); });
+    }
+    out.push(spotCard());
+    return out;
+  }
+
+  function screenMain() {
+    if (!S.me) return;
+    var active = document.activeElement && document.activeElement.id === 'spot' ? document.getElementById('spot').value : null;
+    var tabs = h('div', { class: 'tabs' },
+      h('button', { type: 'button', class: S.tab === 'matches' ? 'on' : '', text: 'Your matches', onclick: function () { S.tab = 'matches'; screenMain(); } }),
+      h('button', { type: 'button', class: S.tab === 'connections' ? 'on' : '', onclick: function () { S.tab = 'connections'; screenMain(); } },
+        'Connections (' + S.mutuals.length + ')', S.unreadWaves && S.tab !== 'connections' ? h('span', { class: 'dot', 'aria-label': 'new waves' }) : null));
+
+    var head = h('div', { class: 'row between' },
+      h('div', null, h('h1', { text: S.me.event_name }),
+        h('p', { class: 'muted', text: 'Signed in as ' + S.me.name + '. ' + (S.cands.length + 1) + ' people here.' })),
+      h('button', { type: 'button', text: 'Refresh', onclick: function () {
+        syncNow(false).then(function () { maybeAskAI(true); toast('Updated'); }).catch(function (e) { toast(e.message); });
+      } }));
+
+    var body = S.tab === 'matches' ? matchesView() : connectionsView();
     var leave = h('button', { type: 'button', text: 'Leave this event', onclick: function () {
       try { localStorage.removeItem(LS_ID); } catch (e) {}
-      S.me = null; if (S.timer) clearInterval(S.timer); screenCode();
+      S.me = null; if (S.timer) clearTimeout(S.timer); screenCode();
     } });
-    render.apply(null, [head, tabs].concat(body, [leave, h('p', { class: 'muted', text: 'Version 1 uses clear matching rules. Smarter AI matching is the next step.' })]));
+    var foot = h('p', { class: 'muted small', text: S.ai.status === 'ready' ? 'Matches picked by AI from what everyone wrote.' : 'Matches use clear rules while AI picks are unavailable.' });
+    render([head, bannersView(), alertsCard(), tabs].concat(body, [leave, foot]));
+    if (active !== null) { var el = document.getElementById('spot'); if (el) { el.value = active; el.focus(); } }
   }
 
   // ---------- start ----------

@@ -43,7 +43,8 @@ alter table interests enable row level security;
 alter table admin_secret enable row level security;
 
 -- Look up an event by its code.
-create or replace function get_event(p_code text)
+drop function if exists get_event(text);
+create function get_event(p_code text)
 returns table(code text, name text)
 language sql security definer set search_path = public as $$
   select e.code, e.name from events e where lower(e.code) = lower(trim(p_code));
@@ -72,7 +73,8 @@ begin
 end $$;
 
 -- Return my own profile.
-create or replace function get_me(p_me uuid)
+drop function if exists get_me(uuid);
+create function get_me(p_me uuid)
 returns table(id uuid, event_code text, event_name text, name text, college text, role text,
               intent text[], need_skills text[], offer_skills text[],
               looking_text text, offer_text text, project text, link text)
@@ -184,5 +186,7 @@ grant execute on function get_event(text), join_event(text,text,text,text,text[]
 -- LAST STEP: set your admin key. Change the text between the quotes to a long
 -- password only you know, then run just this line. Never share it.
 -- ======================================================================
-insert into admin_secret(key) values ('CHANGE-THIS-TO-A-LONG-PASSWORD')
+insert into admin_secret(key)
+select k from (values ('CHANGE-THIS-TO-A-LONG-PASSWORD')) v(k)
+where k not like 'CHANGE-THIS%' and length(k) >= 8   -- the placeholder itself is never saved
 on conflict do nothing;
